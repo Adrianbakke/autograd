@@ -152,7 +152,7 @@ pub struct Matrix {
     elem: Vec<Container>,
     M: usize,
     N: usize,
-    require_grad: bool,
+    pub require_grad: bool,
 }
 
 impl Matrix {
@@ -168,7 +168,7 @@ impl Matrix {
     }
 
     pub fn new_rand(M: usize, N: usize) -> Self {
-        let elem = rand_vec(M * N).iter().map(
+        let elem = rand_vec(M * N, N).iter().map(
             |x| Container::new(*x)).collect::<Vec<_>>();
         Self {
             elem,
@@ -356,7 +356,7 @@ impl Matrix {
             grads.push(e.get().grad().unwrap());                                
         }                                                                       
                                                                               
-        Self::new_wgrad(grads, self.M, self.N) 
+        Self::new(grads, self.M, self.N) 
     }
 
     pub fn sigmoid(&self) -> Self {
@@ -380,9 +380,8 @@ impl Matrix {
         self
     }
 
-    pub fn deactivate_grad(mut self) -> Self {
+    pub fn deactivate_grad(&mut self) {
         self.require_grad = false;
-        self
     }
 
     pub fn sum(mut self) -> Container {
@@ -390,7 +389,16 @@ impl Matrix {
     }
 
     // write a loss function
-    pub fn 
+    pub fn loss(&self, other: &Self) -> Container {
+        let x1 = &self.elem;
+        let x2 = &other.elem;
+        let mut res = (&(&x1[0] - &x2[0]) * &(&x1[0] - &x2[0]));
+        for i in 1..x1.len() {
+            res = &res + &(&(&x2[i] - &x1[i]) * &(&x2[i] - &x1[i]))
+        }
+
+        res
+    }
 }
 
 impl<'a> ops::Add<&'a Matrix> for &'a Matrix {
@@ -451,7 +459,6 @@ impl<'a> ops::Add<&'a Matrix> for f32 {
         let scalar = Container::new(self);
 
         for el in rhs.elem.iter() {
-            println!("{:?} {:?}", el, rg);
             el.get_mut().require_grad = rg;
             res.push(&scalar + &el)
         }
@@ -473,9 +480,7 @@ impl<'a> ops::Sub<&'a Matrix> for f32 {
         let mut res = Vec::new();
 
         let scalar = Container::new(self);
-
         for el in rhs.elem.iter() {
-            println!("{:?} {:?}", el, rg);
             el.get_mut().require_grad = rg;
             res.push(&scalar - &el)
         }
@@ -488,11 +493,25 @@ impl<'a> ops::Sub<&'a Matrix> for f32 {
     }
 }
 
-pub fn rand_vec(n: usize) -> Vec<f32> {
+pub fn rand_vec(n: usize, N: usize) -> Vec<f32> {
     let mut rng = rand::thread_rng();
-    let numbers: Vec<f32> = (0..n).map(|_| {
-        rng.gen_range(-100, 100) as f32 / 100.0
+    let mut numbers: Vec<f32> = (0..n).map(|_| {
+        rng.gen_range(0, 100) as f32
     }).collect();
+
+    for i in 0..(numbers.len() / N) {
+        let mut m = Vec::new();
+        for t in 0..N {
+            m.push(numbers[i * N + t]);
+        }
+
+        let s: f32 = m.iter().sum();
+
+        for t in 0..N {
+            numbers[i * N + t] = numbers[i * N + t] / (s+1_f32);
+        }
+        
+    }
 
     numbers
 }
@@ -563,28 +582,47 @@ impl fmt::Display for Matrix {
 }
 
 pub fn it_works() {
-    let s = 3;
-    let mut v = rand_vec((s * s) as usize);
-    let mut u = rand_vec((s * s) as usize);
+    //let mut v = rand_vec((s * s) as usize);
+    //let mut u = rand_vec((s * s) as usize);
     //let mut l = rand_vec(s as usize);
     //let mut n = rand_vec(s as usize);
 
 
-    let mut m1 = Matrix::new(vec![1.0,2.0,3.0], 3, 1);
+    let a = Matrix::new(vec![0.1,0.2,0.3,0.4], 4, 1).activate_grad();
+    let a1 = Matrix::new(vec![0.1,0.2,0.3,0.4,
+                              0.1,0.2,0.3,0.4,
+                              0.1,0.2,0.3,0.4,
+                              0.1,0.2,0.3,0.4], 4,4);
     //let mut m2 = Matrix::new(vec![1.0,2.0,1.0], 3, 1).activate_grad();
-    let m2 = Matrix::new(vec![1.0,2.0,1.0], 3, 1).activate_grad();
+    //let m2 = Matrix::new(vec![0.1,0.2,0.3], 3, 1).activate_grad();
 
-    println!("{:?}", &m2-&m1);
-    m1.activate_grad();
+    let m3 = (&a1 * &a).sigmoid();
+
+    println!("{}\n", m3);
+
+    let y = Matrix::new(vec![0.0, 1.0, 1.0, 0.0], 4, 1);
+
+    let loss = m3.loss(&y);
+    loss.backward();
+
+
+    println!("{}", &a1 - &(0.1 * &a1.grad()));
+
+    /*
+
+    //let m4 = (&m3 * &m2).sigmoid();
+
+
+    //let t = loss.sum().backward();
+    //println!("{}", m1.grad());
+
     //let m3 = m1.mul(&m2);
     //let m4 = Matrix::new(l, s, 1);
     //let m5 = (m1.mul(&m2)).sigmoid();
 
-/*
     let m6 = Matrix::new(vec![13.0,2.0], 2, 1);
     let m7 = Matrix::new(vec![2.0,1.0], 1, 2);
     let m8 = (m6.mul(&m7)).sigmoid();
-*/
     //let t: Container = m5.elem.iter().sum();
 
     //let x = (&m1*&m2).sigmoid();
@@ -598,5 +636,6 @@ pub fn it_works() {
     //println!("{:?}", sigmoid(&Container::new(2.0)));
     //
     //println!("{}", m2.grad());
+*/
 }
 
