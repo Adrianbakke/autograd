@@ -110,7 +110,7 @@ impl<'a> ops::Sub<&'a Container> for &'a Container {
             z.get_mut().require_grad = true;
 
             self.get_mut().children.push(
-                Child::new(-1.0, Container(Rc::clone(&z.0))));
+                Child::new(1.0, Container(Rc::clone(&z.0))));
 
             rhs.get_mut().children.push(
                 Child::new(-1.0, Container(Rc::clone(&z.0))));
