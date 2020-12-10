@@ -375,9 +375,8 @@ impl Matrix {
         z
     }
 
-    pub fn activate_grad(mut self) -> Self {
+    pub fn activate_grad(&mut self) {
         self.require_grad = true;
-        self
     }
 
     pub fn deactivate_grad(&mut self) {
@@ -582,6 +581,7 @@ impl fmt::Display for Matrix {
 }
 
 pub fn it_works() {
+    /*
     //let mut v = rand_vec((s * s) as usize);
     //let mut u = rand_vec((s * s) as usize);
     //let mut l = rand_vec(s as usize);
@@ -608,7 +608,6 @@ pub fn it_works() {
 
     println!("{}", &a1 - &(0.1 * &a1.grad()));
 
-    /*
 
     //let m4 = (&m3 * &m2).sigmoid();
 
