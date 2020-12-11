@@ -1,18 +1,21 @@
 extern crate grad;
 
+use std::time::SystemTime;
+
 use grad::Matrix;
 
 fn main() {
 
     let y = Matrix::new(vec![0.0, 1.0, 1.0, 0.0], 4, 1);
 
-    let mut nn = vec![Matrix::new_rand(2,16), Matrix::new_rand(16,4), Matrix::new_rand(4,1)];
+    let mut nn = vec![Matrix::new_rand(2,4), Matrix::new_rand(4,1)];
 
-    let epochs = 100000;
+    let epochs = 10000;
     let mut res = y.clone();
 
     let lr = 5 as f32;
 
+    let time = SystemTime::now();
     for u in 0..epochs {
 
         let mut x1 = Matrix::new(vec![0.0, 0.0,
@@ -42,11 +45,13 @@ fn main() {
             // update weight
             nn[i] = &nn[i] - &(lr * &grad);
         }
-        if u % 100 as usize == 0 || u == epochs-1 {
-            print!("\rprogress: {}%",
-                ((u as f32/(epochs-1) as f32) * 100.0) as usize) 
+       
+        if u % 1000 == 0 {
+            print!("loss: {}\n", t); 
         }
+        //((u as f32/(epochs-1) as f32) * 100.0) as usize
     }
 
     println!("\n{}", res);
+    println!("\ntime used: {:?}", time.elapsed().unwrap());
 }
