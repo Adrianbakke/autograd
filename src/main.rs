@@ -10,7 +10,7 @@ fn main() {
 
     let mut nn = vec![Matrix::new_rand(2,4), Matrix::new_rand(4,1)];
 
-    let epochs = 10000;
+    let epochs = 500000;
     let mut res = y.clone();
 
     let lr = 5 as f32;

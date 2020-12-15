@@ -159,6 +159,7 @@ impl Matrix {
     pub fn new(elem: Vec<f32>, M: usize, N: usize) -> Self {
         let elem = elem.iter().map(
             |x| Container::new(*x)).collect::<Vec<_>>();
+
         Self {
             elem,
             M,
@@ -170,6 +171,7 @@ impl Matrix {
     pub fn new_rand(M: usize, N: usize) -> Self {
         let elem = rand_vec(M * N, N).iter().map(
             |x| Container::new(*x)).collect::<Vec<_>>();
+
         Self {
             elem,
             M,
@@ -186,6 +188,7 @@ impl Matrix {
             c.get_mut().require_grad = true;
             c
         }).collect::<Vec<_>>();
+
         Self {
             elem,
             M,
@@ -258,7 +261,7 @@ impl Matrix {
                 row1[i].get_mut().require_grad = rg;
                 row2[i].get_mut().require_grad = rg;
 
-                res.push(&row1[i] - &row2[i]);
+                res.push(&row1[i] + &row2[i]);
             }
         }
         let mut z = Self::from_containers(res, self.M, self.N);
