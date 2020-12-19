@@ -2,15 +2,15 @@ extern crate grad;
 
 use std::time::SystemTime;
 
-use grad::Matrix;
+use grad::Tensor;
 
 fn main() {
-
+ /*
     let y = Matrix::new(vec![0.0, 1.0, 1.0, 0.0], 4, 1);
 
-    let mut nn = vec![Matrix::new_rand(2,4), Matrix::new_rand(4,1)];
+    let mut nn = vec![Matrix::new_rand(2,64), Matrix::new_rand(64,1)];
 
-    let epochs = 10000;
+    let epochs = 50000;
     let mut res = y.clone();
 
     let lr = 5 as f32;
@@ -54,4 +54,7 @@ fn main() {
 
     println!("\n{}", res);
     println!("\ntime used: {:?}", time.elapsed().unwrap());
+ */
+    grad::it_works();
 }
+
