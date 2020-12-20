@@ -1,3 +1,4 @@
+use std::ops;
 
 pub type Dim = (usize, usize);
 
@@ -173,6 +174,19 @@ impl Matrix {
      pub fn sum(self) -> f32 {
         self.elem.iter().sum()
     }
+}
+
+impl<'a> ops::Mul<&'a Matrix> for &'a Matrix {
+    type Output = Matrix;
+
+    fn mul(self, rhs: Self) -> Matrix {
+        if self.dim == (1, 1) || rhs.dim == (1, 1) {
+            self.hadamard(rhs)
+        } else {
+            self.mul(rhs)
+        }
+    }
+}
 /*
 
     pub fn grad(&self) -> Self {                                                
@@ -214,4 +228,3 @@ impl Matrix {
         res
     }
     */
-}
