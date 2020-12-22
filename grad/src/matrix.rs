@@ -33,6 +33,39 @@ impl Matrix {
         row
     }
 
+    //insert column in matrix, changes the matrix (not copying)
+    pub fn insert_column_(&mut self, elem: Vec<f32>, col: usize) {
+        //let elem = elem.to_vec();
+        let N = self.dim.1 as usize;
+        for (c,e) in elem.iter().enumerate() {
+            self.elem[c * N + col] = *e
+        }
+    }
+    
+    pub fn insert_row_(&mut self, elem: Vec<f32>, r: usize,) {
+        //let elem = elem.to_vec();
+        let N = self.dim.1 as usize;
+        for (c,e) in elem.iter().enumerate() {
+            self.elem[r * N + c] = *e
+        }
+    }
+
+    pub fn append_col_(&mut self, elem: Vec<f32>, col: usize) {
+        //let elem = elem.to_vec();
+        let N = self.dim.1 as usize;
+        for i in 0..elem.len()-1 {
+            self.elem.insert(i * N + col, elem[i]);
+        }
+        self.elem.push(elem[elem.len()-1]);
+    }
+
+    pub fn append_row_(&mut self, elem: Vec<f32>) {
+        //let elem = elem.to_vec();
+        for e in elem.iter() {
+            self.elem.push(*e)
+        }
+    }
+
     pub fn dot(vec1: &Vec<f32>, vec2: &Vec<f32>) -> f32 {
         assert!(vec1.len() == vec2.len(), "lengths must be equal");
         let mut res = 0_f32;
@@ -142,21 +175,9 @@ impl Matrix {
         /*
         assert!(self.dim.0 == other.dim.1 && self.dim.0 == other.dim.1,
              "wrong dim must be equal}");
-        */        let (M, N) = self.dim;
-        let (otherM, otherN) = other.dim;
-        let (M, N) = self.dim;
-        let (otherM, otherN) = other.dim;
-
-        let mut lhs = self.clone();
-        let mut rhs = other.clone();
-
-        if M == 1 && N == 1 {
-            lhs = Matrix::new(vec![lhs.elem[0]; otherM*otherN], rhs.dim);
-        }
-
-        if otherM == 1 && otherN == 1 {
-            rhs = Matrix::new(vec![rhs.elem[0]; M*N], lhs.dim);
-        }
+        */ 
+        let lhs = self.clone();
+        let rhs = other.clone();
             
         let mut res = Vec::new();
         for m in 0..lhs.dim.0 {
@@ -164,15 +185,49 @@ impl Matrix {
             let row2 = rhs.get_row(m);
             for i in 0..row1.len() {
                 res.push(&row1[i] * &row2[i]);
-            }        let (M, N) = self.dim;
-        let (otherM, otherN) = other.dim;
+            }
         }
 
         Self::new(res, lhs.dim)
     }
 
-     pub fn sum(self) -> f32 {
+    pub fn sum(self) -> f32 {
         self.elem.iter().sum()
+    }
+
+    pub fn form(&self, dim: Dim) -> Self {
+        if self.dim == dim { return self.clone() }
+
+        if self.dim == (1,1) {
+            return Self::new(vec![self.elem[0]; dim.0*dim.1], (dim))
+        }
+
+        let req = self.dim.0 == dim.0;
+
+        let (tmp_dim, contract_n, extend_n, tmp) = if req {
+            ((dim.0, 1), self.dim.1, dim.1, self.get_col(0))
+        } else {
+            ((1, dim.1), self.dim.0, dim.0, self.get_row(0))
+        };
+
+        let mut res = Self::new(tmp, tmp_dim);
+        for i in 1..contract_n {          
+            let elem = if req { self.get_col(i) } else { self.get_row(i) };
+            let mat = Self::new(elem, tmp_dim);
+            res = res.add(&mat);
+        }
+
+        let tmp = res.elem.clone();
+        for i in 1..extend_n {
+            let elem = tmp.clone();
+            if req {
+                res.append_col_(elem, i)
+            } else {
+                res.append_row_(elem)
+            }
+        }
+        res.dim = dim;
+        res
     }
 }
 
@@ -181,6 +236,7 @@ impl<'a> ops::Mul<&'a Matrix> for &'a Matrix {
 
     fn mul(self, rhs: Self) -> Matrix {
         if self.dim == (1, 1) || rhs.dim == (1, 1) {
+            println!("hadamard");
             self.hadamard(rhs)
         } else {
             self.mul(rhs)

@@ -24,7 +24,6 @@ pub struct Container {
 pub struct Child {
     weights: Matrix,
     grads:   Tensor,
-    lhs:     bool,
 }
 
 #[derive(Debug, Clone)]
@@ -77,28 +76,33 @@ impl Tensor {
     pub fn get_mut(&self) -> RefMut<Container> {
         self.0.borrow_mut()
     }
+
     pub fn grad(self) -> Option<Matrix> {
         match self.get().grad_values {
             None => {
                 let mut grad = Matrix::new(
                     vec![0_f32; self.get_dim().0 * self.get_dim().1],
                     self.get_dim());
-                println!("number of childs: {}", self.get().children.len());
                 let mut t = 0;
                 for child in self.get().children.iter() {
                     t += 1;
-                    let mut w = child.weights.clone();
-                    let mut g = child.grads.clone().grad().unwrap();
 
-                    if t >1 {
-                        grad = grad.add(&w * &g);
+                    let w = child.weights.clone();
+                    let g = child.grads.clone().grad().unwrap();
+                    println!("w {:?}", w);
+
+                    println!("{:?}", t);
+                    if t > 1 {
+                        let w_dim = w.dim;
+                        let g = g.form(w_dim);
+                        println!("w: {:?}\ng: {:?}\ngrad: {:?}\nhadamad: {:?}", w, g, grad, w.hadamard(&g));
+                        grad = grad.add(&(w.hadamard(&g).form(grad.dim)));
                     } else {
-                        grad = &g * &w;
-                    }
-                    
-                    println!("\nres: {:?}\n", grad);
+                        let w_dim = w.dim;
+                        let g = g.form(w_dim);
+                        grad = w.hadamard(&g);
+                    }                    
                 }
-
                 Some(grad)
             }
             _    => self.get().grad_values.clone()
@@ -269,14 +273,19 @@ impl<'a> ops::Sub<&'a Tensor> for &'a Tensor {
 pub fn mul(lhs: &Tensor, rhs: &Tensor) -> Tensor {
     let z = lhs.mul(rhs);
 
-    let grads_lhs = rhs.get_matrix().clone().transpose(); 
-    let grads_rhs = lhs.get_matrix().clone().transpose();
+    let mut grads_lhs = rhs.get_matrix().clone().transpose();
+    grads_lhs = grads_lhs.form(lhs.get_dim());
+
+    let mut grads_rhs = lhs.get_matrix().clone().transpose();
+    grads_rhs = grads_rhs.form(rhs.get_dim());
+
+    println!("rhs: {:?}\nlhs: {:?}", grads_rhs, grads_lhs);
 
     lhs.push(
-        Child::new(grads_rhs, Tensor(Rc::clone(&z.0))));
+        Child::new(grads_lhs, Tensor(Rc::clone(&z.0))));
 
     rhs.push(
-        Child::new(grads_lhs, Tensor(Rc::clone(&z.0))));
+        Child::new(grads_rhs, Tensor(Rc::clone(&z.0))));
 
     z        
 }
@@ -369,15 +378,27 @@ impl fmt::Display for Tensor {
 */
 
 pub fn it_works() {
+    let a = Tensor::new(vec![1.0,2.0,3.0, 1.0,2.0,3.0, 1.0,2.0,3.0], (3,3)).activate_grad();
+    let b = Tensor::new(vec![1.0, 2.0, 3.0], (3,1)).activate_grad();
 
-    let m = Tensor::new(vec![1.0,2.0,3.0], (3,1)).activate_grad();
-    let n = Tensor::new(vec![1.0,2.0,3.0], (1,3)).activate_grad();
-    let l = Tensor::new(vec![1.0], (1,1)).activate_grad();
+    let n = (&a * &b).activate_grad();
+
+    let u = &b.transpose() * &n;
+
+    let z = u.sum().activate_grad();
+
+    z.backward();
+    println!("{:?}", a.grad());
+    println!("{:?}", b.grad());
+
+    //println!("{:?}", b.get_matrix().form((2,3)));
 
 
+    
     //let z = mse(&(&n * &m), &l).activate_grad();
 
     //println!("{:?}",  &(&m * &n));
+    /*
     let u = &m * &n;
     let k = m.transpose();
     let z = &(&k * &u).sum().activate_grad();
@@ -390,5 +411,6 @@ pub fn it_works() {
 
     //println!("{:?}", n.grad());
     println!("{:?}", k.grad());
+    */
 }
 
