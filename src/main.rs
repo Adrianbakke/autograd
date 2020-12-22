@@ -5,7 +5,7 @@ use std::time::SystemTime;
 use grad::Matrix;
 
 fn main() {
-
+/*
     let y = Matrix::new(vec![0.0, 1.0, 1.0, 0.0], 4, 1);
 
     let mut nn = vec![Matrix::new_rand(2,4), Matrix::new_rand(4,1)];
@@ -54,4 +54,6 @@ fn main() {
 
     println!("\n{}", res);
     println!("\ntime used: {:?}", time.elapsed().unwrap());
+*/
+    grad::it_works();
 }

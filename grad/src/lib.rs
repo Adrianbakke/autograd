@@ -328,6 +328,17 @@ impl Matrix {
         z
     }
 
+    pub fn transpose(&mut self) -> Self {
+        let mut vec = Vec::new();
+        for i in 0..self.N {
+            vec.extend(self.get_column(i))
+        }
+        let mut res = self.clone();
+        res.elem = vec;
+        res.M = self.N;
+        res.N = self.M;
+        res
+    }
     /// elementwise multiplication
     pub fn multiply(&self, other: &Self) -> Self {
         assert!(self.N == other.N && self.M == other.M,
@@ -584,27 +595,29 @@ impl fmt::Display for Matrix {
 }
 
 pub fn it_works() {
-    /*
+    
     //let mut v = rand_vec((s * s) as usize);
     //let mut u = rand_vec((s * s) as usize);
     //let mut l = rand_vec(s as usize);
     //let mut n = rand_vec(s as usize);
 
 
-    let a = Matrix::new(vec![0.1,0.2,0.3,0.4], 4, 1).activate_grad();
-    let a1 = Matrix::new(vec![0.1,0.2,0.3,0.4,
-                              0.1,0.2,0.3,0.4,
-                              0.1,0.2,0.3,0.4,
-                              0.1,0.2,0.3,0.4], 4,4);
-    //let mut m2 = Matrix::new(vec![1.0,2.0,1.0], 3, 1).activate_grad();
-    //let m2 = Matrix::new(vec![0.1,0.2,0.3], 3, 1).activate_grad();
+    let mut a = Matrix::new(vec![1.0,2.0,3.0, 1.0,2.0,3.0, 1.0,2.0,3.0], 3, 3);
+    a.activate_grad();
 
-    let m3 = (&a1 * &a).sigmoid();
+    let mut b = Matrix::new(vec![1.0,2.0,3.0], 3, 1);
+    b.activate_grad();
 
-    println!("{}\n", m3);
+    let y = &a * &b;
 
-    let y = Matrix::new(vec![0.0, 1.0, 1.0, 0.0], 4, 1);
+    let n = (&b.transpose() * &y).sum();
 
+    n.backward();
+
+    println!("{}\n", a.grad());
+    println!("{}", b.grad());
+
+/*
     let loss = m3.loss(&y);
     loss.backward();
 
