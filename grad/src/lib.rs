@@ -13,6 +13,13 @@ pub use crate::matrix::{Matrix, Dim};
 use rand::prelude::*;
 
 #[derive(Debug, Clone)]
+pub enum Order {
+    Left,
+    Right,
+    Pass,
+}
+
+#[derive(Debug, Clone)]
 pub struct Container {
     matrix:       Matrix,
     children:     Vec<Child>,
@@ -24,14 +31,15 @@ pub struct Container {
 pub struct Child {
     weights: Matrix,
     grads:   Tensor,
+    order:   Order,
 }
 
 #[derive(Debug, Clone)]
 pub struct Tensor(Rc<RefCell<Container>>);
 
 impl Child {
-    pub fn new(weights: Matrix, grads: Tensor) -> Self {
-        Self { weights, grads }
+    pub fn new(weights: Matrix, grads: Tensor, order: Order) -> Self {
+        Self { weights, grads, order }
     }
 }
 
@@ -80,29 +88,30 @@ impl Tensor {
     pub fn grad(self) -> Option<Matrix> {
         match self.get().grad_values {
             None => {
-                let mut grad = Matrix::new(
-                    vec![0_f32; self.get_dim().0 * self.get_dim().1],
-                    self.get_dim());
+                let mut grad = Matrix::new(vec![], (1,1));
                 let mut t = 0;
                 for child in self.get().children.iter() {
                     t += 1;
-
-                    let w = child.weights.clone();
-                    let g = child.grads.clone().grad().unwrap();
-                    println!("w {:?}", w);
-
-                    println!("{:?}", t);
+                    let mut w = child.weights.clone();
+                    let mut g = child.grads.clone().grad().unwrap();
                     if t > 1 {
-                        let w_dim = w.dim;
-                        let g = g.form(w_dim);
-                        println!("w: {:?}\ng: {:?}\ngrad: {:?}\nhadamad: {:?}", w, g, grad, w.hadamard(&g));
-                        grad = grad.add(&(w.hadamard(&g).form(grad.dim)));
+                        let grad_tmp = match &child.order {
+                            Order::Left  => &(w.transpose()) * &g,
+                            Order::Right => &g * &(w.transpose()),
+                            Order::Pass  => &g * &w,
+                        };
+                        grad = grad.add(&grad_tmp);
                     } else {
-                        let w_dim = w.dim;
-                        let g = g.form(w_dim);
-                        grad = w.hadamard(&g);
+                        println!("child {:?}", child.order);
+                        println!("w {:?}\ng {:?}", w, g);
+                        grad = match &child.order {
+                            Order::Right  => &(w.transpose()) * &g,
+                            Order::Left => &g * &(w.transpose()),
+                            Order::Pass  => &g * &w,
+                        }
                     }                    
                 }
+
                 Some(grad)
             }
             _    => self.get().grad_values.clone()
@@ -193,7 +202,7 @@ impl Tensor {
         let grads = Matrix::new(
             vec![1_f32; self.get_dim().0 * self.get_dim().1], self.get_dim()); 
 
-        self.push(Child::new(grads, Tensor(Rc::clone(&z.0))));
+        self.push(Child::new(grads, Tensor(Rc::clone(&z.0)), Order::Pass));
 
         z
     }
@@ -202,6 +211,12 @@ impl Tensor {
         assert!(
             self.get().require_grad, "activate require_grad to run backward");
         self.get_mut().grad_values = Some(Matrix::new(vec![1.0], (1,1)));
+    }
+
+    //pub fn dot(vec1: ,vec:2)
+
+    pub fn transpose_inplace(&self) {
+        self.get_mut().matrix.transpose_inplace();
     }
 
     pub fn transpose(&self) -> Self {
@@ -224,11 +239,21 @@ impl<'a> ops::Add<&'a Tensor> for &'a Tensor {
             vec![1_f32; self.get_dim().0 * self.get_dim().1],
                  self.get_dim()); 
 
+        /*
+        let grads_lhs = Matrix::new(
+            vec![1_f32],
+                (1,1)); 
+
+        let grads_rhs = Matrix::new(
+            vec![1_f32],
+                (1,1)); 
+        */
+        
         self.push(
-            Child::new(grads_rhs, Tensor(Rc::clone(&z.0))));
+            Child::new(grads_rhs, Tensor(Rc::clone(&z.0)), Order::Pass));
 
         rhs.push(
-            Child::new(grads_lhs, Tensor(Rc::clone(&z.0))));
+            Child::new(grads_lhs, Tensor(Rc::clone(&z.0)), Order::Pass));
 
         z        
     }
@@ -246,6 +271,16 @@ impl<'a> ops::Mul<&'a Tensor> for &'a Tensor {
     }
 }
 
+/*
+impl<'a> ops::Mul<&'a Tensor> for &'a Tensor {
+    type Output = Tensor;
+
+    fn mul(self, rhs: Self) -> Tensor {
+        mul(self, rhs)
+    }
+}
+*/
+/*
 impl<'a> ops::Sub<&'a Tensor> for &'a Tensor {
     type Output = Tensor;
 
@@ -269,27 +304,27 @@ impl<'a> ops::Sub<&'a Tensor> for &'a Tensor {
         z        
     }
 }
-
+*/
 pub fn mul(lhs: &Tensor, rhs: &Tensor) -> Tensor {
     let z = lhs.mul(rhs);
 
-    let mut grads_lhs = rhs.get_matrix().clone().transpose();
-    grads_lhs = grads_lhs.form(lhs.get_dim());
+    let mut grads_lhs = rhs.get_matrix();
+    //grads_lhs = grads_lhs.form(lhs.get_dim());
 
-    let mut grads_rhs = lhs.get_matrix().clone().transpose();
-    grads_rhs = grads_rhs.form(rhs.get_dim());
+    let mut grads_rhs = lhs.get_matrix();
+    //grads_rhs = grads_rhs.form(rhs.get_dim());
 
     println!("rhs: {:?}\nlhs: {:?}", grads_rhs, grads_lhs);
 
+
     lhs.push(
-        Child::new(grads_lhs, Tensor(Rc::clone(&z.0))));
+        Child::new(grads_lhs, Tensor(Rc::clone(&z.0)), Order::Left));
 
     rhs.push(
-        Child::new(grads_rhs, Tensor(Rc::clone(&z.0))));
+        Child::new(grads_rhs, Tensor(Rc::clone(&z.0)), Order::Right));
 
     z        
 }
-
 
 pub fn hadamard(lhs: &Tensor, rhs: &Tensor) -> Tensor {
     let z = lhs.hadamard(&rhs);
@@ -298,20 +333,22 @@ pub fn hadamard(lhs: &Tensor, rhs: &Tensor) -> Tensor {
     let grads_rhs = lhs.get_matrix();
 
     lhs.push(
-        Child::new(grads_rhs, Tensor(Rc::clone(&z.0))));
+        Child::new(grads_rhs, Tensor(Rc::clone(&z.0)), Order::Pass));
 
     rhs.push(
-        Child::new(grads_lhs, Tensor(Rc::clone(&z.0))));
+        Child::new(grads_lhs, Tensor(Rc::clone(&z.0)), Order::Pass));
 
     z        
 }
 
+/*
 pub fn mse(x: &Tensor, y: &Tensor) -> Tensor {
     let sub = x - y;
     let z = hadamard(&sub, &sub);
 
     z.sum()
 }
+*/
         
 /*
 pub fn sum(tensor: &mut Tensor) -> Container { 
@@ -379,17 +416,31 @@ impl fmt::Display for Tensor {
 
 pub fn it_works() {
     let a = Tensor::new(vec![1.0,2.0,3.0, 1.0,2.0,3.0, 1.0,2.0,3.0], (3,3)).activate_grad();
-    let b = Tensor::new(vec![1.0, 2.0, 3.0], (3,1)).activate_grad();
+    let b = Tensor::new(vec![1.0,2.0,3.0], (1,3)).activate_grad();
+    let r = Tensor::new(vec![6.0,12.0,18.0], (1,3)).activate_grad();
+    let c = Tensor::new(vec![1.0,2.0,3.0], (3,1)).activate_grad();
 
-    let n = (&a * &b).activate_grad();
+    let k = (&c * &(&b * &a)).activate_grad();
+    println!("k {:?} r {:?}", k, r);
+    let n = (&r * &k).activate_grad();
 
-    let u = &b.transpose() * &n;
+    //let n = (&b * &a).activate_grad();
 
-    let z = u.sum().activate_grad();
+    //let u = &b.transpose() * &n;
+    //println!("n: {:?}", n);
+    let z = n.sum().activate_grad();
 
     z.backward();
-    println!("{:?}", a.grad());
     println!("{:?}", b.grad());
+    println!("{:?}", a.grad());
+    println!("{:?}", c.grad());
+    println!("{:?}", r.grad());
+
+
+    //println!("{:?}", c.grad());
+
+    //println!("{:?}", c.grad());
+
 
     //println!("{:?}", b.get_matrix().form((2,3)));
 

@@ -161,6 +161,16 @@ impl Matrix {
         self
     }
 
+    pub fn eye(&mut self, dim: Dim) {
+        let val = self.elem[0];
+        let mut elem = vec![0_f32; dim.0 * dim.1];
+        for i in 0..dim.0 {
+            elem[dim.1 * i + i] = val;
+        }
+        self.elem = elem;
+        self.dim = dim;
+    }
+
     pub fn transpose_inplace(&mut self) {
         let mut vec = Vec::new();
         for i in 0..self.dim.1 {
@@ -170,12 +180,21 @@ impl Matrix {
         self.dim = (self.dim.1, self.dim.0);
     }
 
+
+
     /// elementwise multiplication
     pub fn hadamard(&self, other: &Self) -> Self {
         /*
         assert!(self.dim.0 == other.dim.1 && self.dim.0 == other.dim.1,
              "wrong dim must be equal}");
-        */ 
+        */
+        
+        if self.dim == (1,1) {
+            return Self::new(vec![self.elem[0]; other.dim.0*other.dim.1], other.dim)
+        }
+        if other.dim == (1,1) {
+            return Self::new(vec![other.elem[0]; self.dim.0*self.dim.1], self.dim)
+        }
         let lhs = self.clone();
         let rhs = other.clone();
             
@@ -195,29 +214,55 @@ impl Matrix {
         self.elem.iter().sum()
     }
 
+/*
+    pub fn form_x(&self, dim: Dim) -> Self {
+        let mut axis = 0;
+        if self.dim.0 == 1 && other.dim.0 > 1 {
+
+        }
+        else if self.dim.0 > 1 && other.dim.0 == 0 {
+
+        }
+        else if self.dim.1 == 1 && other.dim.1 > 1 {
+
+        }
+        else if self.dim.1 > 1 && other.dim.1 == 0 {
+
+        }
+
+    }
+*/
+
     pub fn form(&self, dim: Dim) -> Self {
         if self.dim == dim { return self.clone() }
 
         if self.dim == (1,1) {
-            return Self::new(vec![self.elem[0]; dim.0*dim.1], (dim))
+            return Self::new(vec![self.elem[0]; dim.0*dim.1], dim)
         }
 
-        let req = self.dim.0 == dim.0;
+        let req = self.dim.1 == dim.0;
 
+        if self.dim.0 == dim.1 && req { return self.clone().transpose() }
+
+        // 1 down 0 left
+        // 2x3 3x4 -> 2x4 | 3x2 -> 3x4 || 8x3 
+        // 3x1 -> 3x3 and 3x3 -> 1x3
         let (tmp_dim, contract_n, extend_n, tmp) = if req {
-            ((dim.0, 1), self.dim.1, dim.1, self.get_col(0))
+            ((1, dim.0), self.dim.0, dim.1, self.get_row(0))
         } else {
-            ((1, dim.1), self.dim.0, dim.0, self.get_row(0))
+            ((dim.1, 1), self.dim.1, dim.0, self.get_col(0))
         };
 
         let mut res = Self::new(tmp, tmp_dim);
         for i in 1..contract_n {          
-            let elem = if req { self.get_col(i) } else { self.get_row(i) };
+            let elem = if req { self.get_row(i) } else { self.get_col(i) };
             let mat = Self::new(elem, tmp_dim);
             res = res.add(&mat);
         }
-
         let tmp = res.elem.clone();
+        if tmp.len() > 1 {
+            res.transpose_inplace();
+        }
         for i in 1..extend_n {
             let elem = tmp.clone();
             if req {
@@ -236,7 +281,6 @@ impl<'a> ops::Mul<&'a Matrix> for &'a Matrix {
 
     fn mul(self, rhs: Self) -> Matrix {
         if self.dim == (1, 1) || rhs.dim == (1, 1) {
-            println!("hadamard");
             self.hadamard(rhs)
         } else {
             self.mul(rhs)
