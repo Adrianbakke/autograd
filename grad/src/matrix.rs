@@ -4,13 +4,14 @@ pub type Dim = (usize, usize);
 
 #[derive(Clone,Debug)]
 pub struct Matrix {
-    pub elem: Vec<f32>,
-    pub dim:  (usize, usize),
+    pub elem:         Vec<f32>,
+    pub dim:          (usize, usize),
+    pub is_transpose: bool,
 }
 
 impl Matrix {
     pub fn new(elem: Vec<f32>, dim: Dim) -> Self {
-        Self { elem, dim }
+        Self { elem, dim, is_transpose: false }
     }
 
     pub fn get_col(&self, col_num: usize) -> Vec<f32> {
@@ -157,6 +158,7 @@ impl Matrix {
         }
         self.elem = vec;
         self.dim = (self.dim.1, self.dim.0);
+        self.is_transpose = true;
 
         self
     }
@@ -178,6 +180,7 @@ impl Matrix {
         }
         self.elem = vec;
         self.dim = (self.dim.1, self.dim.0);
+        self.is_transpose = true;
     }
 
 
@@ -213,25 +216,6 @@ impl Matrix {
     pub fn sum(self) -> f32 {
         self.elem.iter().sum()
     }
-
-/*
-    pub fn form_x(&self, dim: Dim) -> Self {
-        let mut axis = 0;
-        if self.dim.0 == 1 && other.dim.0 > 1 {
-
-        }
-        else if self.dim.0 > 1 && other.dim.0 == 0 {
-
-        }
-        else if self.dim.1 == 1 && other.dim.1 > 1 {
-
-        }
-        else if self.dim.1 > 1 && other.dim.1 == 0 {
-
-        }
-
-    }
-*/
 
     pub fn form(&self, dim: Dim) -> Self {
         if self.dim == dim { return self.clone() }
@@ -280,51 +264,11 @@ impl<'a> ops::Mul<&'a Matrix> for &'a Matrix {
     type Output = Matrix;
 
     fn mul(self, rhs: Self) -> Matrix {
-        if self.dim == (1, 1) || rhs.dim == (1, 1) {
+        if self.dim == (1, 1) || rhs.dim == (1, 1) || self.dim == rhs.dim {
             self.hadamard(rhs)
         } else {
             self.mul(rhs)
         }
     }
 }
-/*
 
-    pub fn grad(&self) -> Self {                                                
-        // run backward before this                                             
-        let mut grads = Vec::new();                                             
-        for e in self.elem.iter() {                                             
-            grads.push(e.get().grad().unwrap());                                
-        }                                                                       
-                                                                              
-        Self::new(grads, self.M, self.N) 
-    }
-
-    pub fn sigmoid(&self) -> Self {
-        let rg = self.require_grad;
-
-        let mut res = Vec::new();
-
-        for e in self.elem.iter() {
-            res.push(sigmoid(e));
-        }
-
-        res        let (M, N) = self.dim;
-        let (otherM, otherN) = other.dim;
-    }
-
-     pub fn sum(mut self) -> Container {
-        self.elem.iter().sum()
-    }
-
-    // write a loss function
-    pub fn loss(&self, other: &Self) -> Container {
-        let x1 = &self.elem;
-        let x2 = &other.elem;
-        let mut res = (&(&x1[0] - &x2[0]) * &(&x1[0] - &x2[0]));
-        for i in 1..x1.len() {
-            res = &res + &(&(&x2[i] - &x1[i]) * &(&x2[i] - &x1[i]))
-        }
-
-        res
-    }
-    */
