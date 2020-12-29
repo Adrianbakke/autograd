@@ -2,25 +2,29 @@ extern crate grad;
 
 use std::time::SystemTime;
 
-use grad::Tensor;
+use grad::{Tensor, mse};
 
 fn main() {
-    let y = Matrix::new(vec![0.0, 1.0, 1.0, 0.0], 4, 1);
+    //grad::it_works();
+    let y = Tensor::new(vec![0.0, 1.0, 1.0, 0.0], (4, 1));
 
-    let mut nn = vec![Matrix::new_rand(2,64), Matrix::new_rand(64,1)];
+    let mut nn = vec![Tensor::new_rand((2,120)), Tensor::new_rand((120,120)), Tensor::new_rand((120,4)), Tensor::new_rand((4,1))];
 
-    let epochs = 50000;
+    let epochs = 50_000;
     let mut res = y.clone();
 
-    let lr = 5 as f32;
+    let lr = Tensor::new(vec![5_f32], (1,1));
+
+    println!("{}", nn[0]);
+    println!("{}", nn[1]);
+
 
     let time = SystemTime::now();
     for u in 0..epochs {
-
-        let mut x1 = Matrix::new(vec![0.0, 0.0,
+        let mut x1 = Tensor::new(vec![0.0, 0.0,
                                       0.0, 1.0,
                                       1.0, 0.0,
-                                      1.0, 1.0], 4, 2);
+                                      1.0, 1.0], (4, 2));
 
         // do the forward
         x1.activate_grad();
@@ -28,8 +32,15 @@ fn main() {
             x1 = (&x1 * n).sigmoid();
         }
         
+        //if u > 1 { break };
+
+        //println!("x1 {}", x1);
+        
         // compute loss
-        let t = x1.loss(&y);
+        let t = mse(&x1, &y);
+        
+        //println!("t {}", t);
+
 
         res = x1.clone();
 
@@ -39,11 +50,18 @@ fn main() {
             nn[i].deactivate_grad();
 
             // calculate gradient of weight
-            let grad = nn[i].grad();
+            let grad = nn[i].get_grad();
 
+            /*
+            println!("inside {}", i);
+            println!("grad\n{}\n", grad);
+            println!("n\n{}", nn[i]);
+            */
             // update weight
-            nn[i] = &nn[i] - &(lr * &grad);
+            nn[i] = &nn[i] - &(&lr * &grad);
+            //println!("res \n{}", nn[i]);
         }
+        //println!("n0 \n{}", nn[0]);
        
         if u % 1000 == 0 {
             print!("loss: {}\n", t); 

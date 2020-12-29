@@ -192,15 +192,16 @@ impl Matrix {
              "wrong dim must be equal}");
         */
         
-        if self.dim == (1,1) {
-            return Self::new(vec![self.elem[0]; other.dim.0*other.dim.1], other.dim)
+        let mut lhs = self.clone();
+        let mut rhs = other.clone();
+
+        if lhs.dim == (1,1) {
+            lhs = Self::new(vec![lhs.elem[0]; rhs.dim.0 * rhs.dim.1], rhs.dim)
         }
         if other.dim == (1,1) {
-            return Self::new(vec![other.elem[0]; self.dim.0*self.dim.1], self.dim)
+            rhs = Self::new(vec![rhs.elem[0]; lhs.dim.0 * lhs.dim.1], lhs.dim)
         }
-        let lhs = self.clone();
-        let rhs = other.clone();
-            
+
         let mut res = Vec::new();
         for m in 0..lhs.dim.0 {
             let row1 = lhs.get_row(m);
@@ -264,7 +265,7 @@ impl<'a> ops::Mul<&'a Matrix> for &'a Matrix {
     type Output = Matrix;
 
     fn mul(self, rhs: Self) -> Matrix {
-        if self.dim == (1, 1) || rhs.dim == (1, 1) || self.dim == rhs.dim {
+        if self.dim == (1, 1) || rhs.dim == (1, 1) || (self.dim == rhs.dim && (self.dim.0 == 1 || self.dim.1 == 1)) {
             self.hadamard(rhs)
         } else {
             self.mul(rhs)
