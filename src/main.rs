@@ -2,10 +2,11 @@ extern crate grad;
 
 use std::time::SystemTime;
 
-use grad::{Tensor, mse};
+use grad::{Tensor};
 
 fn main() {
-    //grad::it_works();
+    grad::it_works();
+    /*
     let y = Tensor::new(vec![0.0, 1.0, 1.0, 0.0], (4, 1));
 
     let mut nn = vec![Tensor::new_rand((2,120)), Tensor::new_rand((120,120)), Tensor::new_rand((120,4)), Tensor::new_rand((4,1))];
@@ -71,5 +72,6 @@ fn main() {
 
     println!("\n{}", res);
     println!("\ntime used: {:?}", time.elapsed().unwrap());
+    */
 }
 
