@@ -37,7 +37,7 @@ fn main() {
         //println!("x1 {}", x1);
         
         // compute loss
-        let t = mse(&x1, &y);
+        let mut t = mse(&x1, &y);
         
         //println!("t {}", t);
 
@@ -46,11 +46,12 @@ fn main() {
 
         // do the backward pass
         t.backward();
-        for i in 0..nn.len() {
-            nn[i].deactivate_grad();
+        let len = nn.len();
+        for i in 1..nn.len()-1 {
+            nn[len-i].deactivate_grad();
 
             // calculate gradient of weight
-            let grad = nn[i].get_grad();
+            let grad = nn[len-i].get_grad();
 
             /*
             println!("inside {}", i);
@@ -58,7 +59,7 @@ fn main() {
             println!("n\n{}", nn[i]);
             */
             // update weight
-            nn[i] = &nn[i] - &(&lr * &grad);
+            nn[len-i] = &nn[len-i] - &(&lr * &grad);
             //println!("res \n{}", nn[i]);
         }
         //println!("n0 \n{}", nn[0]);

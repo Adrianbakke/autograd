@@ -82,14 +82,20 @@ impl Matrix {
         
         let mut lhs = self.clone();
         let mut rhs = other.clone();
+        
+        let mut res_dim = lhs.dim;
 
         if M == 1 && N == 1 {
             lhs = Matrix::new(vec![lhs.elem[0]; otherM*otherN], rhs.dim);
+            res_dim = rhs.dim;
         }
 
         if otherM == 1 && otherN == 1 {
             rhs = Matrix::new(vec![rhs.elem[0]; M*N], lhs.dim);
+            res_dim = lhs.dim;
         }
+
+        let (M, N) = res_dim;
 
         //assert!(N == otherN && M == otherM,
         //     "wrong dim - must be equal}");
@@ -103,7 +109,7 @@ impl Matrix {
             }
         }
 
-        Self::new(res, self.dim)
+        Self::new(res, res_dim)
     }
 
     pub fn sub(&self, other: &Self) -> Self {
@@ -195,11 +201,15 @@ impl Matrix {
         let mut lhs = self.clone();
         let mut rhs = other.clone();
 
+        let mut res_dim = lhs.dim;
+
         if lhs.dim == (1,1) {
-            lhs = Self::new(vec![lhs.elem[0]; rhs.dim.0 * rhs.dim.1], rhs.dim)
+            lhs = Self::new(vec![lhs.elem[0]; rhs.dim.0 * rhs.dim.1], rhs.dim);
+            res_dim = rhs.dim;
         }
-        if other.dim == (1,1) {
-            rhs = Self::new(vec![rhs.elem[0]; lhs.dim.0 * lhs.dim.1], lhs.dim)
+        if rhs.dim == (1,1) {
+            rhs = Self::new(vec![rhs.elem[0]; lhs.dim.0 * lhs.dim.1], lhs.dim);
+            res_dim = lhs.dim;
         }
 
         let mut res = Vec::new();
@@ -211,7 +221,7 @@ impl Matrix {
             }
         }
 
-        Self::new(res, lhs.dim)
+        Self::new(res, res_dim)
     }
 
     pub fn sum(self) -> f32 {
@@ -265,7 +275,7 @@ impl<'a> ops::Mul<&'a Matrix> for &'a Matrix {
     type Output = Matrix;
 
     fn mul(self, rhs: Self) -> Matrix {
-        if self.dim == (1, 1) || rhs.dim == (1, 1) || (self.dim == rhs.dim && (self.dim.0 == 1 || self.dim.1 == 1)) {
+        if self.dim == (1, 1) || rhs.dim == (1, 1) {
             self.hadamard(rhs)
         } else {
             self.mul(rhs)

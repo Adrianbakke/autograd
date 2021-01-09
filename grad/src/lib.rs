@@ -149,7 +149,7 @@ impl Tensor {
         let cont = Container {
             children: vec![],
             grad_values: None,
-            requires_grad: false,
+            requires_grad: false, 
         };
 
         let container = Rc::new(RefCell::new(cont));
@@ -165,11 +165,10 @@ impl Tensor {
         let cont = Container {
             children: vec![],
             grad_values: None,
-            requires_grad: false,
+            requires_grad: false, 
         };
 
         let container = Rc::new(RefCell::new(cont));
-
 
         Self { matrix, container }
     }
@@ -178,15 +177,19 @@ impl Tensor {
         let cont = Container {
             children: vec![],
             grad_values: None,
-            requires_grad: false,
+            requires_grad: false, 
         };
-        Self { matrix, container: Rc::new(RefCell::new(cont)) }
+
+        let container = Rc::new(RefCell::new(cont));
+
+        Self { matrix, container }
     }
 
     pub fn from_tensor(&self) -> Self {
         let matrix = self.matrix.clone();
-        let cont = Rc::clone(&self.container);
-        Self { matrix, container: cont }
+        let container = Rc::clone(&self.container);
+
+        Self { matrix, container }
     }
 
     pub fn push(&self, child: Child) {
@@ -209,48 +212,45 @@ impl Tensor {
         self.container.borrow_mut()
     }
 
-    pub fn get_grad(&self) -> Self {
+    pub fn get_grad(&mut self) -> Self {
         Tensor::from_mat(self.grad().unwrap())
     }
 
     pub fn grad(&self) -> Option<Matrix> {
-        match self.get().grad_values {
-            None => {
-                let mut grad = Matrix::new(vec![], (1,1));
-                let mut t = 0;
-                for child in self.get().children.iter() {
-                    t += 1;
-                    let mut w = child.weights.clone();
-                    let mut g = child.grads.clone().grad().unwrap();
-                    if t > 1 {
-                        let mut grad_tmp = match &child.order {
-                            Order::Right => &(w.transpose()) * &g,
-                            Order::Left  => &g * &(w.transpose()),
-                            Order::Pass  => g.hadamard(&w),
-                        };
-                        if child.transpose { grad_tmp = grad_tmp.transpose() };
-                        grad = grad.add(&grad_tmp);
-                    } else {
-                        grad = match &child.order {
-                            Order::Right => &w.transpose() * &g,
-                            Order::Left  => &g * &w.transpose(),
-                            Order::Pass  => g.hadamard(&w),
-                        };
-                        if child.transpose { grad = grad.transpose() };
-                    }                    
-                    //self.get_mut().grad_values = Some(grad.clone());
-                }
-                Some(grad)
+        let isNone = match self.get().grad_values {
+            None => true,
+            _    => false,
+        };
+
+        if isNone {
+            let mut grad = Matrix::new(vec![0_f32], (1,1));
+            for child in self.get().children.iter() {
+                let mut w = child.weights.clone();
+                let mut g = child.grads.grad().unwrap();
+                let mut grad_tmp = match &child.order {
+                    Order::Right => &w.transpose() * &g,
+                    Order::Left  => &g * &w.transpose(),
+                    Order::Pass  => g.hadamard(&w),
+                };
+                if child.transpose { grad_tmp = grad_tmp.transpose() };
+                grad = grad.add(&grad_tmp);
             }
-            _    => self.get().grad_values.clone()
+            self.set_grad_values(grad.clone());
+            Some(grad)
+        } else {
+            self.get().grad_values.clone()
         }
     }
 
-    pub fn activate_grad(&self) {
+    pub fn set_grad_values(&self, grad: Matrix) {
+        self.get_mut().grad_values = Some(grad);
+    }
+
+    pub fn activate_grad(&mut self) {
         self.get_mut().requires_grad = true;
     }
 
-    pub fn deactivate_grad(&self) {
+    pub fn deactivate_grad(&mut self) {
         self.get_mut().requires_grad = false;
     }
 
@@ -284,7 +284,7 @@ impl Tensor {
 
     pub fn sum(&self) -> Self {
         let sum = self.get_matrix().sum();
-        let z = Self::new(vec![sum], (1,1));
+        let mut z = Self::new(vec![sum], (1,1));
 
         if self.requires_grad() {
             let grads = Matrix::new(
@@ -304,7 +304,7 @@ impl Tensor {
             res.push((1.0 / (1.0 + (-e as f64).exp())) as f32)
         }
 
-        let z = Self::new(res.clone(), self.matrix.dim);
+        let mut z = Self::new(res.clone(), self.matrix.dim);
 
         if self.requires_grad() {
             let mut grads_vec = vec![];
@@ -323,7 +323,7 @@ impl Tensor {
         z
     }
 
-    pub fn backward(&self) {
+    pub fn backward(&mut self) {
         assert!(
             self.get().requires_grad, "activate requires_grad to run backward");
         self.get_mut().grad_values = Some(Matrix::new(vec![1.0], (1,1)));
@@ -345,7 +345,7 @@ impl<'a> ops::Add<&'a Tensor> for &'a Tensor {
     type Output = Tensor;
 
     fn add(self, rhs: Self) -> Tensor {
-        let z = self.add(rhs);
+        let mut z = self.add(rhs);
 
         if self.requires_grad() || rhs.requires_grad() {
             let (lhs_child, rhs_child) = Child::create_childs_add(&self, &rhs, &z);
@@ -364,7 +364,7 @@ impl<'a> ops::Mul<&'a Tensor> for &'a Tensor {
     type Output = Tensor;
 
     fn mul(self, rhs: Self) -> Tensor {
-        if self.get_dim() == (1, 1) || rhs.get_dim() == (1, 1) || (self.get_dim() == rhs.get_dim() && (self.get_dim().0 == 1 || self.get_dim().1 == 1)) {
+        if self.get_dim() == (1, 1) || rhs.get_dim() == (1, 1) {
             hadamard(self, rhs)
         } else {
             mul(self, rhs)
@@ -376,7 +376,7 @@ impl<'a> ops::Sub<&'a Tensor> for &'a Tensor {
     type Output = Tensor;
 
     fn sub(self, rhs: Self) -> Tensor {
-        let z = self.sub(rhs);
+        let mut z = self.sub(rhs);
 
         if self.requires_grad() || rhs.requires_grad() {
             let (lhs_child, rhs_child) = Child::create_childs_sub(&self, &rhs, &z);
@@ -392,7 +392,7 @@ impl<'a> ops::Sub<&'a Tensor> for &'a Tensor {
 }
 
 pub fn mul(lhs: &Tensor, rhs: &Tensor) -> Tensor {
-    let z = lhs.mul(rhs);
+    let mut z = lhs.mul(rhs);
     
     if lhs.requires_grad() || rhs.requires_grad(){
         let (lhs_child, rhs_child) = Child::create_childs_mul(&lhs, &rhs, &z);
@@ -408,7 +408,7 @@ pub fn mul(lhs: &Tensor, rhs: &Tensor) -> Tensor {
 
 
 pub fn hadamard(lhs: &Tensor, rhs: &Tensor) -> Tensor {
-    let z = lhs.hadamard(&rhs);
+    let mut z = lhs.hadamard(&rhs);
 
     if lhs.requires_grad() || rhs.requires_grad() {
         let (lhs_child, rhs_child) = Child::create_childs_hadamard(&lhs, &rhs, &z);
@@ -502,13 +502,12 @@ pub fn it_works() {
                                   1.0, 0.0,
                                   1.0, 1.0], (4, 2));
     let y = Tensor::new(vec![0.0, 1.0, 1.0, 0.0], (4, 1));
-    let test = Tensor::new(vec![5.0, 3.0, 3.0, 9.0], (4, 1));
+    let mut test = Tensor::new(vec![5.0, 3.0, 3.0, 9.0], (4, 1));
     a.activate_grad();
     b.activate_grad();
     test.activate_grad();
 
 
-    println!("{:?}", test.pow());
     //println!("b@a: {:?}", &b * &a);
 
     let mut n = (&(&x1 * &a).sigmoid() * &b).sigmoid();
@@ -518,9 +517,8 @@ pub fn it_works() {
     //
     //println!("n: {:?}", n);
     
-    let z = mse(&n, &y);
+    let mut z = mse(&n, &y);
 
-    println!("here");
     //let n = (&b * &a).activate_grad();
 
     //let u = &b.transpose() * &n;
@@ -529,9 +527,10 @@ pub fn it_works() {
     
     
     z.backward();
-    //println!("{:?}", a);
+    println!("{:?}\n", x1.get_grad());
+    println!("{:?}\n\n\n", x1);
+
     println!("{:?}\n", a.get_grad());
-    println!("{:?}\n", b.get_grad());
     //println!("{:?}", b.grad());
 }
 
