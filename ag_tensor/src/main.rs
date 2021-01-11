@@ -32,15 +32,8 @@ fn main() {
             x1 = (&x1 * n).sigmoid();
         }
         
-        //if u > 1 { break };
-
-        //println!("x1 {}", x1);
-        
         // compute loss
         let mut t = mse(&x1, &y);
-        
-        //println!("t {}", t);
-
 
         res = x1.clone();
 
@@ -53,21 +46,13 @@ fn main() {
             // calculate gradient of weight
             let grad = nn[len-i].get_grad();
 
-            /*
-            println!("inside {}", i);
-            println!("grad\n{}\n", grad);
-            println!("n\n{}", nn[i]);
-            */
             // update weight
             nn[len-i] = &nn[len-i] - &(&lr * &grad);
-            //println!("res \n{}", nn[i]);
         }
-        //println!("n0 \n{}", nn[0]);
        
         if u % 1000 == 0 {
             print!("loss: {}\n", t); 
         }
-        //((u as f32/(epochs-1) as f32) * 100.0) as usize
     }
 
     println!("\n{}", res);

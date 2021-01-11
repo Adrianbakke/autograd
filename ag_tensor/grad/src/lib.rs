@@ -21,8 +21,9 @@ pub enum Order {
 
 #[derive(Debug, Clone)]
 pub struct Container {
-    children:     Vec<Child>,
-    grad_values:  Option<Matrix>,
+    matrix:        Matrix,
+    children:      Vec<Child>,
+    grad_values:   Option<Matrix>,
     requires_grad: bool,
 }
 
@@ -34,16 +35,9 @@ pub struct Child {
     transpose: bool,
 }
 
-/*
-#[derive(Debug, Clone)]
-pub struct Tensor(Rc<RefCell<Container>>);
-*/
 
 #[derive(Debug, Clone)]
-pub struct Tensor {
-    matrix: Matrix,
-    container: Rc<RefCell<Container>>,
-}
+pub struct Tensor(Rc<RefCell<Container>>);
 
 impl Child {
     pub fn new(weights: Matrix, grads: Tensor, order: Order) -> Self {
@@ -147,6 +141,7 @@ impl Tensor {
         let matrix = Matrix::new(elem, dim);
 
         let cont = Container {
+            matrix,
             children: vec![],
             grad_values: None,
             requires_grad: false, 
@@ -154,7 +149,7 @@ impl Tensor {
 
         let container = Rc::new(RefCell::new(cont));
 
-        Self { matrix, container }
+        Self(container)
     }
 
     pub fn new_rand(dim: Dim) -> Self {
@@ -163,6 +158,7 @@ impl Tensor {
         let matrix = Matrix::new(elem, dim);
 
         let cont = Container {
+            matrix,
             children: vec![],
             grad_values: None,
             requires_grad: false, 
@@ -170,11 +166,12 @@ impl Tensor {
 
         let container = Rc::new(RefCell::new(cont));
 
-        Self { matrix, container }
+        Self(container)
     }
 
     pub fn from_mat(matrix: Matrix) -> Self {
         let cont = Container {
+            matrix,
             children: vec![],
             grad_values: None,
             requires_grad: false, 
@@ -182,34 +179,33 @@ impl Tensor {
 
         let container = Rc::new(RefCell::new(cont));
 
-        Self { matrix, container }
+        Self(container)
     }
 
     pub fn from_tensor(&self) -> Self {
-        let matrix = self.matrix.clone();
-        let container = Rc::clone(&self.container);
+        let container = Rc::clone(&self.0);
 
-        Self { matrix, container }
+        Self(container)
     }
 
     pub fn push(&self, child: Child) {
-        self.container.borrow_mut().children.push(child);
+        self.get_mut().children.push(child);
     }
 
     pub fn get_matrix(&self) -> Matrix {
-        self.matrix.clone()
+        self.get().matrix.clone()
     }
 
     pub fn get_dim(&self) -> Dim {
-        self.matrix.dim
+        self.get().matrix.dim
     }
 
     pub fn get(&self) -> Ref<Container> {
-        self.container.borrow()
+        self.0.borrow()
     }
 
     pub fn get_mut(&self) -> RefMut<Container> {
-        self.container.borrow_mut()
+        self.0.borrow_mut()
     }
 
     pub fn get_grad(&mut self) -> Self {
@@ -225,14 +221,14 @@ impl Tensor {
         if isNone {
             let mut grad = Matrix::new(vec![0_f32], (1,1));
             for child in self.get().children.iter() {
-                let mut w = child.weights.clone();
-                let mut g = child.grads.grad().unwrap();
+                let w = child.weights.clone();
+                let g = child.grads.grad().unwrap();
                 let mut grad_tmp = match &child.order {
                     Order::Right => &w.transpose() * &g,
                     Order::Left  => &g * &w.transpose(),
                     Order::Pass  => g.hadamard(&w),
                 };
-                if child.transpose { grad_tmp = grad_tmp.transpose() };
+                if child.transpose { grad_tmp.transpose_inplace() };
                 grad = grad.add(&grad_tmp);
             }
             self.set_grad_values(grad.clone());
@@ -300,11 +296,11 @@ impl Tensor {
 
     pub fn sigmoid(&self) -> Self {
         let mut res = vec![];
-        for e in self.matrix.elem.iter() {
+        for e in self.get().matrix.elem.iter() {
             res.push((1.0 / (1.0 + (-e as f64).exp())) as f32)
         }
 
-        let mut z = Self::new(res.clone(), self.matrix.dim);
+        let mut z = Self::new(res.clone(), self.get_dim());
 
         if self.requires_grad() {
             let mut grads_vec = vec![];
@@ -312,7 +308,7 @@ impl Tensor {
                 grads_vec.push(e * (1.0 - e))
             }
 
-            let grads = Matrix::new(grads_vec, self.matrix.dim);
+            let grads = Matrix::new(grads_vec, self.get_dim());
             let child = Child::new(grads, z.from_tensor(), Order::Pass);
 
             self.push(child);
@@ -329,15 +325,13 @@ impl Tensor {
         self.get_mut().grad_values = Some(Matrix::new(vec![1.0], (1,1)));
     }
 
-    pub fn transpose_inplace(&mut self) {
-        self.matrix.transpose_inplace();
+    pub fn transpose_inplace(&self) {
+        self.get_mut().matrix.transpose_inplace();
     }
 
-    pub fn transpose(&self) -> Self {
-        let mut res = Self::from_mat(self.get_matrix().transpose());
-        res.container = Rc::clone(&self.container);
-
-        res
+    pub fn transpose(self) -> Self {
+        self.get_mut().matrix.transpose_inplace();
+        self 
     }
 }
 
@@ -430,7 +424,7 @@ pub fn mse(x: &Tensor, y: &Tensor) -> Tensor {
 pub fn rand_vec(n: usize, N: usize) -> Vec<f32> {
     let mut rng = rand::thread_rng();
     let mut numbers: Vec<f32> = (0..n).map(|_| {
-        rng.gen_range(0, 100) as f32
+        rng.gen_range(-100, 100) as f32
     }).collect();
 
     for i in 0..(numbers.len() / N) {
@@ -454,7 +448,7 @@ pub fn rand_vec(n: usize, N: usize) -> Vec<f32> {
 impl fmt::Display for Tensor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut res = String::new();
-        let matrix = self.matrix.clone();
+        let matrix = self.get_matrix();
         let l = matrix.elem.len();
         for m in 0..matrix.dim.0 {
             if matrix.dim.0 < 7 || m < 3 || m > matrix.dim.0-3 {
