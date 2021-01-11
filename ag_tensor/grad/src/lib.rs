@@ -35,7 +35,6 @@ pub struct Child {
     transpose: bool,
 }
 
-
 #[derive(Debug, Clone)]
 pub struct Tensor(Rc<RefCell<Container>>);
 
@@ -50,7 +49,6 @@ impl Child {
 
     pub fn create_childs_mul(lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
         let mut grads_lhs = rhs.get_matrix();
-
         let mut grads_rhs = lhs.get_matrix();
 
         let lhs_t = grads_lhs.is_transpose;
@@ -399,7 +397,6 @@ pub fn mul(lhs: &Tensor, rhs: &Tensor) -> Tensor {
 
     z        
 }
-
 
 pub fn hadamard(lhs: &Tensor, rhs: &Tensor) -> Tensor {
     let mut z = lhs.hadamard(&rhs);
