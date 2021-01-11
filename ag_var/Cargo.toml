@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 grad = { path = "grad" }
-rand = "*"
+rand = "0.7.3"

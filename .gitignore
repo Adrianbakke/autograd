@@ -1,5 +1,3 @@
-target
-*py
-py*
-*py*
+*target
+*Cargo.lock
 *swp
