@@ -488,7 +488,7 @@ impl fmt::Display for Tensor {
     }
 }
 
-pub fn it_works() {
+pub fn test() {
     let mut a = Tensor::new(vec![0.2405, 0.0464, 0.3038, 0.4051, 0.4147, 0.2212, 0.1244, 0.2350], (2,4));
     let mut b = Tensor::new(vec![0.9857, 0.9792, 0.9828, 0.9859], (4,1));
     let mut x1 = Tensor::new(vec![0.0, 0.0,
@@ -502,29 +502,12 @@ pub fn it_works() {
     test.activate_grad();
 
 
-    //println!("b@a: {:?}", &b * &a);
-
     let mut n = (&(&x1 * &a).sigmoid() * &b).sigmoid();
-    //let n = (&b.transpose() * &k).activate_grad();
-    
-    //let mut n = (&c.transpose() * &k).activate_grad();
-    //
-    //println!("n: {:?}", n);
-    
+
     let mut z = mse(&n, &y);
 
-    //let n = (&b * &a).activate_grad();
-
-    //let u = &b.transpose() * &n;
-    //let z = n.sum().activate_grad();
-
-    
     
     z.backward();
     println!("{:?}\n", x1.get_grad());
-    println!("{:?}\n\n\n", x1);
-
-    println!("{:?}\n", a.get_grad());
-    //println!("{:?}", b.grad());
 }
 
