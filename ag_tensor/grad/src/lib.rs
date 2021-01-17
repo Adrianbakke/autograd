@@ -47,90 +47,19 @@ impl Child {
         self.transpose = b;
     }
 
-    pub fn create_childs_mul(lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
-        let mut grads_lhs = rhs.get_matrix();
-        let mut grads_rhs = lhs.get_matrix();
+    pub fn create(vec: Vec<&Tensor>, grad: Vec<Matrix>, order: Vec<Order>, z: &Tensor) -> Vec<Self> {
+        let mut res = vec![];
+        for i in 0..vec.len() {
+            let v_t = vec[i].get().matrix.is_transpose;
 
-        let lhs_t = grads_lhs.is_transpose;
-        let rhs_t = grads_rhs.is_transpose;
+            let mut child = Self::new(grad[i].clone(), z.from_tensor(), order[i].clone());
 
-        let mut lhs_child =
-            Self::new(grads_lhs, z.from_tensor(), Order::Left);
+            if v_t { child.set_transpose(true) }
 
-        let mut rhs_child =
-            Self::new(grads_rhs, z.from_tensor(), Order::Right);
+            res.push(child);
+        }
 
-        if lhs_t { rhs_child.set_transpose(true) }
-        if rhs_t { lhs_child.set_transpose(true) }
-
-        (lhs_child, rhs_child)
-    }
-
-    pub fn create_childs_add(lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
-        let lhs_t = rhs.get_matrix().is_transpose;
-        let rhs_t = lhs.get_matrix().is_transpose;
-
-        let grads_lhs = Matrix::new(
-            vec![1_f32; rhs.get_dim().0 * rhs.get_dim().1],
-                 rhs.get_dim()); 
-
-        let grads_rhs = Matrix::new(
-            vec![1_f32; lhs.get_dim().0 * lhs.get_dim().1],
-                 lhs.get_dim()); 
-
-        let mut lhs_child =
-            Self::new(grads_lhs, z.from_tensor(), Order::Pass);
-
-        let mut rhs_child =
-            Self::new(grads_rhs, z.from_tensor(), Order::Pass);
-
-        if lhs_t { rhs_child.set_transpose(true) }
-        if rhs_t { lhs_child.set_transpose(true) }
-
-        (lhs_child, rhs_child)
-    }
-
-    pub fn create_childs_sub(lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
-        let lhs_t = rhs.get_matrix().is_transpose;
-        let rhs_t = lhs.get_matrix().is_transpose;
-
-        let grads_lhs = Matrix::new(
-            vec![1_f32; rhs.get_dim().0 * rhs.get_dim().1],
-                 rhs.get_dim()); 
-
-        let grads_rhs = Matrix::new(
-            vec![-1_f32; lhs.get_dim().0 * lhs.get_dim().1],
-                 lhs.get_dim()); 
-
-        let mut lhs_child =
-            Self::new(grads_lhs, z.from_tensor(), Order::Pass);
-
-        let mut rhs_child =
-            Self::new(grads_rhs, z.from_tensor(), Order::Pass);
-
-        if lhs_t { rhs_child.set_transpose(true) }
-        if rhs_t { lhs_child.set_transpose(true) }
-
-        (lhs_child, rhs_child)
-    }
-
-    pub fn create_childs_hadamard(lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
-        let lhs_t = rhs.get_matrix().is_transpose;
-        let rhs_t = lhs.get_matrix().is_transpose;
-
-        let grads_lhs = rhs.get_matrix(); 
-        let grads_rhs = lhs.get_matrix();
-
-        let mut lhs_child =
-            Self::new(grads_lhs, z.from_tensor(), Order::Pass);
-
-        let mut rhs_child =
-            Self::new(grads_rhs, z.from_tensor(), Order::Pass);
-
-        if lhs_t { rhs_child.set_transpose(true) }
-        if rhs_t { lhs_child.set_transpose(true) }
-
-        (lhs_child, rhs_child)
+        res
     }
 }
 
@@ -340,10 +269,12 @@ impl<'a> ops::Add<&'a Tensor> for &'a Tensor {
         let mut z = self.add(rhs);
 
         if self.requires_grad() || rhs.requires_grad() {
-            let (lhs_child, rhs_child) = Child::create_childs_add(&self, &rhs, &z);
+            let (M,N) = self.get_dim();
+            let grads = vec![Matrix::new(vec![1_f32; M * N], (M, N)); 2]; 
+            let childs = Child::create(vec![&self, &rhs], grads, vec![Order::Pass; 2], &z);
 
-            self.push(lhs_child);
-            rhs.push(rhs_child);
+            self.push(childs[0].clone());
+            rhs.push(childs[1].clone());
 
             z.activate_grad();
         }
@@ -371,10 +302,15 @@ impl<'a> ops::Sub<&'a Tensor> for &'a Tensor {
         let mut z = self.sub(rhs);
 
         if self.requires_grad() || rhs.requires_grad() {
-            let (lhs_child, rhs_child) = Child::create_childs_sub(&self, &rhs, &z);
+            let (M,N) = self.get_dim();
+            let grad_lhs = Matrix::new(vec![1_f32; M * N], (M, N)); 
+            let grad_rhs = Matrix::new(vec![-1_f32; M * N], (M, N)); 
 
-            self.push(lhs_child);
-            rhs.push(rhs_child);
+            let childs = Child::create(
+                vec![&self, &rhs], vec![grad_lhs, grad_rhs], vec![Order::Pass; 2], &z);
+
+            self.push(childs[0].clone());
+            rhs.push(childs[1].clone());
 
             z.activate_grad();
         }
@@ -387,10 +323,11 @@ pub fn mul(lhs: &Tensor, rhs: &Tensor) -> Tensor {
     let mut z = lhs.mul(rhs);
     
     if lhs.requires_grad() || rhs.requires_grad(){
-        let (lhs_child, rhs_child) = Child::create_childs_mul(&lhs, &rhs, &z);
+        let grads = vec![rhs.get().matrix.clone(), lhs.get().matrix.clone()];
+        let childs = Child::create(vec![&lhs, &rhs], grads, vec![Order::Left, Order::Right], &z);
 
-        lhs.push(lhs_child);
-        rhs.push(rhs_child);
+        lhs.push(childs[0].clone());
+        rhs.push(childs[1].clone());
 
         z.activate_grad();
     }
@@ -402,10 +339,11 @@ pub fn hadamard(lhs: &Tensor, rhs: &Tensor) -> Tensor {
     let mut z = lhs.hadamard(&rhs);
 
     if lhs.requires_grad() || rhs.requires_grad() {
-        let (lhs_child, rhs_child) = Child::create_childs_hadamard(&lhs, &rhs, &z);
+        let grads = vec![lhs.get().matrix.clone(), rhs.get().matrix.clone()];
+        let childs = Child::create(vec![&rhs, &lhs], grads, vec![Order::Pass; 2], &z);
 
-        lhs.push(lhs_child);
-        rhs.push(rhs_child);
+        lhs.push(childs[0].clone());
+        rhs.push(childs[1].clone());
 
         z.activate_grad();
     }
