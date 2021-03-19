@@ -1,7 +1,6 @@
 use std::ops;
 use std::cell::{Ref, RefMut, RefCell};
 use std::rc::Rc;
-use std::iter::Sum;
 use std::fmt;
 
 extern crate rand;
@@ -47,9 +46,10 @@ impl Child {
         self.transpose = b;
     }
 
-    pub fn create_childs_mul(lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
-        let mut grads_lhs = rhs.get_matrix();
-        let mut grads_rhs = lhs.get_matrix();
+    pub fn create_childs_mul
+        (lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
+        let grads_lhs = rhs.get_matrix();
+        let grads_rhs = lhs.get_matrix();
 
         let lhs_t = grads_lhs.is_transpose;
         let rhs_t = grads_rhs.is_transpose;
@@ -66,9 +66,10 @@ impl Child {
         (lhs_child, rhs_child)
     }
 
-    pub fn create_childs_add(lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
-        let lhs_t = rhs.get_matrix().is_transpose;
-        let rhs_t = lhs.get_matrix().is_transpose;
+    pub fn create_childs_add
+        (lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
+        let lhs_t = rhs.get().matrix.is_transpose;
+        let rhs_t = lhs.get().matrix.is_transpose;
 
         let grads_lhs = Matrix::new(
             vec![1_f32; rhs.get_dim().0 * rhs.get_dim().1],
@@ -90,9 +91,10 @@ impl Child {
         (lhs_child, rhs_child)
     }
 
-    pub fn create_childs_sub(lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
-        let lhs_t = rhs.get_matrix().is_transpose;
-        let rhs_t = lhs.get_matrix().is_transpose;
+    pub fn create_childs_sub
+        (lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
+        let lhs_t = rhs.get().matrix.is_transpose;
+        let rhs_t = lhs.get().matrix.is_transpose;
 
         let grads_lhs = Matrix::new(
             vec![1_f32; rhs.get_dim().0 * rhs.get_dim().1],
@@ -114,12 +116,13 @@ impl Child {
         (lhs_child, rhs_child)
     }
 
-    pub fn create_childs_hadamard(lhs: &Tensor, rhs: &Tensor, z: &Tensor) -> (Self, Self) {
-        let lhs_t = rhs.get_matrix().is_transpose;
-        let rhs_t = lhs.get_matrix().is_transpose;
-
+    pub fn create_childs_hadamard
+        (lhs: &Tensor, rhs: &Tensor, z: &Tensor)-> (Self, Self) {
         let grads_lhs = rhs.get_matrix(); 
         let grads_rhs = lhs.get_matrix();
+
+        let lhs_t = grads_lhs.is_transpose;
+        let rhs_t = grads_rhs.is_transpose;
 
         let mut lhs_child =
             Self::new(grads_lhs, z.from_tensor(), Order::Pass);
@@ -211,12 +214,12 @@ impl Tensor {
     }
 
     pub fn grad(&self) -> Option<Matrix> {
-        let isNone = match self.get().grad_values {
+        let is_none = match self.get().grad_values {
             None => true,
             _    => false,
         };
 
-        if isNone {
+        if is_none {
             let mut grad = Matrix::new(vec![0_f32], (1,1));
             for child in self.get().children.iter() {
                 let w = child.weights.clone();
@@ -282,7 +285,8 @@ impl Tensor {
 
         if self.requires_grad() {
             let grads = Matrix::new(
-                vec![1_f32; self.get_dim().0 * self.get_dim().1], self.get_dim());
+                vec![1_f32; self.get_dim().0 * self.get_dim().1],
+                self.get_dim());
 
             self.push(Child::new(grads, z.from_tensor(), Order::Pass));
 
@@ -319,7 +323,8 @@ impl Tensor {
 
     pub fn backward(&mut self) {
         assert!(
-            self.get().requires_grad, "activate requires_grad to run backward");
+            self.get().requires_grad,
+            "activate requires_grad to run backward");
         self.get_mut().grad_values = Some(Matrix::new(vec![1.0], (1,1)));
     }
 
@@ -340,7 +345,8 @@ impl<'a> ops::Add<&'a Tensor> for &'a Tensor {
         let mut z = self.add(rhs);
 
         if self.requires_grad() || rhs.requires_grad() {
-            let (lhs_child, rhs_child) = Child::create_childs_add(&self, &rhs, &z);
+            let (lhs_child, rhs_child) =
+                Child::create_childs_add(&self, &rhs, &z);
 
             self.push(lhs_child);
             rhs.push(rhs_child);
@@ -371,7 +377,8 @@ impl<'a> ops::Sub<&'a Tensor> for &'a Tensor {
         let mut z = self.sub(rhs);
 
         if self.requires_grad() || rhs.requires_grad() {
-            let (lhs_child, rhs_child) = Child::create_childs_sub(&self, &rhs, &z);
+            let (lhs_child, rhs_child) =
+                Child::create_childs_sub(&self, &rhs, &z);
 
             self.push(lhs_child);
             rhs.push(rhs_child);
@@ -402,7 +409,8 @@ pub fn hadamard(lhs: &Tensor, rhs: &Tensor) -> Tensor {
     let mut z = lhs.hadamard(&rhs);
 
     if lhs.requires_grad() || rhs.requires_grad() {
-        let (lhs_child, rhs_child) = Child::create_childs_hadamard(&lhs, &rhs, &z);
+        let (lhs_child, rhs_child) =
+            Child::create_childs_hadamard(&lhs, &rhs, &z);
 
         lhs.push(lhs_child);
         rhs.push(rhs_child);
@@ -446,7 +454,6 @@ impl fmt::Display for Tensor {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut res = String::new();
         let matrix = self.get_matrix();
-        let l = matrix.elem.len();
         for m in 0..matrix.dim.0 {
             if matrix.dim.0 < 7 || m < 3 || m > matrix.dim.0-3 {
                 res.push_str("|");
@@ -473,8 +480,8 @@ impl fmt::Display for Tensor {
                 } else {
                     sl = 9 * matrix.dim.1 + 2;
                 }
-                for n in 0..2 {
-                    for x in 0..sl {
+                for _ in 0..2 {
+                    for _ in 0..sl {
                         res.push_str(".")
                     }
                     res.push_str("\n");
@@ -486,7 +493,8 @@ impl fmt::Display for Tensor {
 }
 
 pub fn test() {
-    let mut a = Tensor::new(vec![0.2405, 0.0464, 0.3038, 0.4051, 0.4147, 0.2212, 0.1244, 0.2350], (2,4));
+    let mut a = Tensor::new(vec![0.2405, 0.0464, 0.3038, 0.4051, 0.4147,
+        0.2212, 0.1244, 0.2350], (2,4));
     let mut b = Tensor::new(vec![0.9857, 0.9792, 0.9828, 0.9859], (4,1));
     let mut x1 = Tensor::new(vec![0.0, 0.0,
                                   0.0, 1.0,
